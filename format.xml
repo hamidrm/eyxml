@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+
+<eyxml>
+<structure>
+  <tag name="page" allowed_inner_tags="page|item"/>
+  <tag name="elem" allowed_inner_tags="elem|page"/>
+  <tag name="item" allowed_inner_tags="item"/>
+  <tag name="ui" allowed_inner_tags=""/>
+</structure>
+
+<attributes>
+  <attr name="height" values="Int"/>
+  <attr name="h-align" values="left|center|right"/>
+  <attr name="v-align" values="top|middle|bottom"/>
+  <attr name="text" values="string"/>
+</attributes>
+
+<config>
+    <memory yxmlBufferSize="4096" malloc="malloc" free="free" max_tag_name_len="32" max_attr_name_len="16"/>
+</config>
+</eyxml>

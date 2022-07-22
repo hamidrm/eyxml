@@ -1,0 +1,535 @@
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include "eyxml_parser.h"
+
+
+
+static const char * eyxml_tags_str[EYXML_TAGS_NUMBER] = {
+  <<<eyxml_tags_str>>>
+};
+
+static const EyxmlAttributesValuesType eyxml_attrs_types[EYXML_ATTRS_NUMBER] = {
+  <<<eyxml_attrs_types_str>>>
+};
+
+static const char * eyxml_attrs_str[EYXML_ATTRS_NUMBER] = {
+  <<<eyxml_attrs_str>>>
+};
+
+static const char * eyxml_attr_bool_str[2] = {
+  "false",
+  "true"
+};
+
+<<<eyxml_attrs_lists_str>>>
+
+
+static const char * ui_parser_error_str[128] = {
+  "Unexpected EOF",\
+  "Invalid character or entity reference",\
+  "Close tag does not match open tag (<Tag> .. </OtherTag>)",\
+  "Stack overflow (too deeply nested tags or too long element/attribute name)",\
+  "Syntax error (unexpected byte)",\
+  "Syntax error (using this tag not allowed in current tag)",\
+  "Undefined Tag",
+  "Undefined Attribute",
+  "Invalid value (for this type of attribute)",
+};
+
+
+static const uint32_t eyxml_tags_rule_mat[EYXML_TAGS_NUMBER][EYXML_TAGS_NUMBER]={
+<<<eyxml_tags_rule_mat>>>
+};
+
+
+static void * heap_addr_list[1024];
+static size_t heap_size_list[1024];
+
+static void __add_addr(void * ptr, size_t size){
+	for(int i=0;i<1024;i++)
+		if(heap_addr_list[i] == 0){
+			heap_addr_list[i] = ptr;
+			heap_size_list[i] = size;
+			return;
+		}
+}
+
+static size_t __get_size(void * ptr){
+	for(int i=0;i<1024;i++)
+		if(heap_addr_list[i] == ptr){
+			heap_addr_list[i] = 0;
+			return heap_size_list[i];
+		}
+}
+
+static void __init_dic(void){
+	for(int i=0;i<1024;i++)
+		heap_addr_list[i] = 0;
+
+}
+
+static void * eyxml_malloc(eyxml_t * eyxml_context, size_t size);
+static void eyxml_free(eyxml_t * eyxml_context, void * ptr);
+static void eyxml_remove_all_attributes(eyxml_t * eyxml_context, eyxml_tag_t * tag);
+static void eyxml_remove_all_childs(eyxml_t * eyxml_context, eyxml_tag_t * tag);
+static void * eyxml_get_attr_val(eyxml_elem_t * elem, EyxmlAttribs attr);
+
+EYXML_GET_ATTR_DEF_FUN(STRING);
+EYXML_GET_ATTR_DEF_FUN(BOOL);
+EYXML_GET_ATTR_DEF_FUN(COLOR);
+EYXML_GET_ATTR_DEF_FUN(INT);
+EYXML_GET_ATTR_DEF_FUN(UINT);
+EYXML_GET_ATTR_DEF_FUN(DECIMAL);
+
+<<<eyxml_get_attr_def_fun>>>
+
+static void * eyxml_malloc(eyxml_t * eyxml_context, size_t size){
+  void * ptr;
+  eyxml_context->heap_used+=size;
+  ptr = <<<eyxml_malloc_fun>>>(size);
+  __add_addr(ptr, size);
+  return ptr;
+}
+
+static void eyxml_free(eyxml_t * eyxml_context, void * ptr){
+  size_t size = __get_size(ptr);
+  eyxml_context->heap_used-=size;
+  <<<eyxml_free_fun>>>(ptr);
+}
+
+static void * eyxml_get_attr_val(eyxml_elem_t * elem, EyxmlAttribs attr){
+	eyxml_tag_t * elem_obj = (eyxml_tag_t *)elem;
+	eyxml_attrib_t * current_attr = elem_obj->attribs_root;
+	while(current_attr){
+		if(current_attr->type == attr)
+			return (void *)(&current_attr->value.str_v);
+		current_attr = current_attr->next_attrib;
+	}
+	return NULL;
+}
+
+static void eyxml_remove_all_attributes(eyxml_t * eyxml_context, eyxml_tag_t * tag){
+  eyxml_attrib_t    * attribs_head = tag->attribs_root;
+  eyxml_attrib_t    * remove_attr = NULL;
+  eyxml_attrib_t    * cur_attr = attribs_head;
+
+  while(cur_attr){
+    remove_attr = cur_attr;
+    cur_attr = cur_attr->next_attrib;
+    if((eyxml_attrs_types[remove_attr->type] == EYXML_TYPE_STRING)&& remove_attr->value.str_v)
+    	eyxml_free(eyxml_context, remove_attr->value.str_v);
+    eyxml_free(eyxml_context, remove_attr);
+  }
+
+  tag->attribs_cnt = 0;
+  tag->attribs_root = NULL;
+}
+
+static void eyxml_remove_all_childs(eyxml_t * eyxml_context, eyxml_tag_t * tag){
+  eyxml_tag_t    * childs_head = tag->childs_root;
+  eyxml_tag_t    * remove_tag = NULL;
+  eyxml_tag_t    * cur_tag = childs_head;
+
+  while(cur_tag){
+    remove_tag = cur_tag;
+    eyxml_remove_all_attributes(eyxml_context, remove_tag);
+    eyxml_remove_all_childs(eyxml_context, remove_tag);
+    if(remove_tag->str_value)
+    	eyxml_free(eyxml_context, remove_tag->str_value);
+    cur_tag = cur_tag->next_tag;
+    eyxml_free(eyxml_context, remove_tag);
+  }
+  tag->attribs_cnt = 0;
+  tag->attribs_root = NULL;
+  tag->childs_cnt = 0;
+  tag->childs_root = NULL;
+}
+
+static size_t eyxml_get_attr(eyxml_t * eyxml_context, const char ** attr_val_list_str, size_t list_size, const char * attr_val_str){
+  char * temp = (char *)eyxml_malloc(eyxml_context, strlen(attr_val_str)+1);
+  char * temp_ptr = temp;
+  for(const char *p = attr_val_str;*p;++p , temp_ptr++) *temp_ptr=*p>0x40&&*p<0x5b?*p|0x60:*p;
+  *temp_ptr=0;
+  for(uint8_t i=0;i<list_size;i++)
+    if(strcmp(temp, attr_val_list_str[i])==0){
+    	eyxml_free(eyxml_context, temp);
+    	return i;
+    }
+  eyxml_free(eyxml_context, temp);
+  return list_size;
+}
+
+static EyxmlTags eyxml_get_tag(eyxml_t * eyxml_context, const char * tag_str){
+  char temp[EYXML_TAGS_NAME_MAX_LENGTH];
+  char * temp_ptr = temp;
+  for(const char *p = tag_str;*p;++p , temp_ptr++) *temp_ptr=*p>0x40&&*p<0x5b?*p|0x60:*p;
+  *temp_ptr=0;
+  for(uint8_t i=0;i<EYXML_TAGS_NUMBER;i++)
+    if(strcmp(temp,eyxml_tags_str[i])==0)
+    	return i;
+  return EYXML_TAGS_NUMBER;
+}
+
+static EyxmlAttribs eyxml_get_attrib(eyxml_t * eyxml_context, const char * attrib_str){
+  char temp[EYXML_ATTRS_NAME_MAX_LENGTH];
+  char * temp_ptr = temp;
+  for(const char *p = attrib_str;*p;++p , temp_ptr++) *temp_ptr=*p>0x40&&*p<0x5b?*p|0x60:*p;
+  *temp_ptr=0;
+  for(uint8_t i=0;i<EYXML_ATTRS_NUMBER;i++)
+    if(strcmp(temp,eyxml_attrs_str[i])==0)
+      return i;
+  return EYXML_ATTRS_NUMBER;
+}
+
+
+static EyxmlStatus eyxml_set_attr_value(eyxml_t * eyxml_context, eyxml_attrib_t * current_attr, const char * value){
+	switch(eyxml_attrs_types[current_attr->type]){
+	case EYXML_TYPE_STRING:
+	{
+		size_t length = strlen(value);
+		current_attr->value.str_v = (char *)eyxml_malloc(eyxml_context, length + 1);
+		memcpy(current_attr->value.str_v, value, length + 1);
+	}
+	break;
+	case EYXML_TYPE_BOOL:
+	{
+		uint32_t bool_val = eyxml_get_attr(eyxml_context, eyxml_attr_bool_str, 2, value);
+		if(bool_val>1)
+			return EYXML_STATUS_ERR;
+		current_attr->value.uint_v = bool_val;
+	}
+	break;
+	case EYXML_TYPE_COLOR:
+	{
+		uint32_t color_val;
+		if(value[0]!='#')
+			return EYXML_STATUS_ERR;
+		color_val = strtol(&value[1], NULL, 16);
+		current_attr->value.uint_v = color_val;
+	}
+	break;
+	case EYXML_TYPE_INT:
+	{
+		int32_t int_val;
+
+		int_val = strtol(value, NULL, 10);
+		current_attr->value.int_v = int_val;
+	}
+	break;
+	case EYXML_TYPE_UINT:
+	{
+		uint32_t uint_val;
+		uint_val = atoi(value);
+		current_attr->value.uint_v = uint_val;
+	}
+	break;
+	case  EYXML_TYPE_DECIMAL:
+	{
+		float float_val;
+		float_val = atof(value);
+		current_attr->value.float_v = float_val;
+	}
+	break;
+<<<eyxml_set_attr_val_case>>>
+	}
+	return EYXML_STATUS_OK;
+}
+
+static EyxmlStatus eyxml_check_tags_rules(eyxml_tag_t * current_tag, EyxmlTags tag){
+	if(current_tag->type == -1)
+		return EYXML_STATUS_OK;
+	else
+  return (eyxml_tags_rule_mat[tag][current_tag->type])?EYXML_STATUS_OK:EYXML_STATUS_ERR;
+}
+
+void eyxml_init(eyxml_t * eyxml_context){
+  eyxml_tag_t    * root;
+  __init_dic();
+  eyxml_context->heap_used = 0;
+  eyxml_context->yxml_context = (yxml_t *)eyxml_malloc(eyxml_context, sizeof(yxml_t) + YXML_BUFSIZE);
+  yxml_init(eyxml_context->yxml_context, eyxml_context->yxml_context+1, YXML_BUFSIZE);
+
+  root = (eyxml_tag_t *)eyxml_malloc(eyxml_context, sizeof(eyxml_tag_t));
+  root->attribs_cnt = 0;
+  root->childs_cnt = 0;
+  root->attribs_root = NULL;
+  root->childs_root = NULL;
+  root->parent = NULL;
+  root->next_tag = NULL;
+  root->type = -1;
+
+  eyxml_context->root = (eyxml_elem_t *)root;
+}
+
+eyxml_attrib_t * eyxml_add_attrib(eyxml_t * eyxml_context, eyxml_tag_t * tag){
+  eyxml_attrib_t    * attribs_head = tag->attribs_root;
+  eyxml_attrib_t    * new_attrib;
+  eyxml_attrib_t    * temp;
+
+  new_attrib = (eyxml_attrib_t *)eyxml_malloc(eyxml_context, sizeof(eyxml_attrib_t));
+  temp = attribs_head;
+  if(temp == NULL)
+    tag->attribs_root = new_attrib;
+  else{
+    while(temp->next_attrib)
+      temp = temp->next_attrib;
+    temp->next_attrib = new_attrib;
+  }
+  new_attrib->next_attrib = NULL;
+  tag->attribs_cnt++;
+  return new_attrib;
+}
+
+EyxmlStatus eyxml_remove_attrib(eyxml_t * eyxml_context, eyxml_tag_t * tag, eyxml_attrib_t * attrib_to_remove){
+  eyxml_attrib_t    * attribs_head = tag->attribs_root;
+  eyxml_attrib_t    * prv_attr = NULL;
+  eyxml_attrib_t    * cur_attr = attribs_head;
+
+  while(cur_attr){
+    if(attrib_to_remove == cur_attr){
+      if(prv_attr == NULL)
+        tag->attribs_root = tag->attribs_root->next_attrib;
+      else
+        prv_attr->next_attrib = cur_attr->next_attrib;
+      eyxml_free(eyxml_context, attrib_to_remove);
+      tag->attribs_cnt--;
+      return EYXML_STATUS_OK;
+    }
+    prv_attr = cur_attr;
+    cur_attr = cur_attr->next_attrib;
+  }
+  return EYXML_STATUS_ERR;
+}
+
+
+eyxml_tag_t * eyxml_add_tag(eyxml_t * eyxml_context, eyxml_tag_t * parent_tag){
+  eyxml_tag_t    * childs_head = parent_tag->childs_root;
+  eyxml_tag_t    * new_tag;
+  eyxml_tag_t    * temp;
+
+  new_tag = (eyxml_tag_t *)eyxml_malloc(eyxml_context, sizeof(eyxml_tag_t));
+
+  temp = childs_head;
+
+  if(temp == NULL){
+    parent_tag->childs_root = new_tag;
+    new_tag->parent = parent_tag;
+  }
+  else
+  {
+    while(temp->next_tag)
+      temp = temp->next_tag;
+    temp->next_tag = new_tag;
+    new_tag->parent = parent_tag;
+  }
+  parent_tag->childs_cnt++;
+
+  new_tag->str_value = NULL;
+  new_tag->next_tag = NULL;
+  new_tag->childs_root = NULL;
+  new_tag->attribs_root = NULL;
+  new_tag->attribs_cnt = 0;
+  new_tag->childs_cnt = 0;
+  return new_tag;
+}
+
+const char * eyxml_err_str(EyxmlParserError err){
+	return ui_parser_error_str[err];
+}
+
+EyxmlStatus eyxml_remove_tag(eyxml_t * eyxml_context, eyxml_tag_t * parent_tag, eyxml_tag_t * tag_to_remove){
+  eyxml_tag_t    * tags_head = parent_tag->childs_root;
+  eyxml_tag_t    * prv_tag = NULL;
+  eyxml_tag_t    * cur_tag = tags_head;
+  while(cur_tag){
+    if(tag_to_remove == cur_tag){
+      if(prv_tag == NULL)
+        parent_tag->childs_root = parent_tag->childs_root->next_tag;
+      else
+        prv_tag->next_tag = cur_tag->next_tag;
+
+      eyxml_remove_all_attributes(eyxml_context, tag_to_remove);
+      eyxml_remove_all_childs(eyxml_context, tag_to_remove);
+      eyxml_free(eyxml_context, tag_to_remove);
+      parent_tag->childs_cnt--;
+      return EYXML_STATUS_OK;
+    }
+    prv_tag = cur_tag;
+    cur_tag = cur_tag->next_tag;
+  }
+  return   EYXML_STATUS_ERR;
+}
+
+size_t eyxml_count_childs(eyxml_elem_t * node){
+	eyxml_tag_t * elem_obj = (eyxml_tag_t *)node;
+	return elem_obj->childs_cnt;
+}
+
+eyxml_elem_t * eyxml_next_child(eyxml_elem_t * node, eyxml_elem_t * prev_child){
+	eyxml_tag_t * elem_obj = (eyxml_tag_t *)node;
+	if(prev_child == NULL)
+		return (eyxml_elem_t *)elem_obj->childs_root;
+	else
+		return (eyxml_elem_t *)(((eyxml_tag_t *)prev_child)->next_tag);
+}
+
+eyxml_elem_t * eyxml_get_child_at(eyxml_elem_t * node, uint32_t index){
+	eyxml_tag_t * elem_obj = (eyxml_tag_t *)node;
+	eyxml_tag_t * child_elem_obj = elem_obj->childs_root;
+	if(elem_obj->childs_cnt > index){
+		while(child_elem_obj){
+			if(index--==0)
+				return (eyxml_elem_t *)child_elem_obj;
+			child_elem_obj=child_elem_obj->next_tag;
+		}
+	}
+	return NULL;
+}
+
+void eyxml_parse(eyxml_t * eyxml_context){
+  const char * xml_str = eyxml_context->xml_data;
+  yxml_ret_t yxml_ret_val;
+
+  uint8_t  is_innner_value=0;
+  eyxml_tag_t * current_tag = (eyxml_tag_t *)eyxml_context->root;
+  eyxml_attrib_t * current_attr = NULL;
+
+  uint32_t	attr_value_offset;
+  char *	attr_value;
+
+  uint32_t	tag_value_offset;
+  char *	tag_value = NULL;
+
+  while(*xml_str) {
+    yxml_ret_val = yxml_parse(eyxml_context->yxml_context, *xml_str);
+    switch(yxml_ret_val) {
+    /* XML Errors */
+    case YXML_EEOF:
+    case YXML_EREF:
+    case YXML_ESTACK:
+    case YXML_ECLOSE:
+    case YXML_ESYN:
+      if(eyxml_context->on_error_cb)
+        eyxml_context->on_error_cb(yxml_ret_val-YXML_EEOF, eyxml_context->yxml_context->line, eyxml_context->yxml_context->byte);
+      return;
+    /* XML Tags */
+    case YXML_OK:
+    /* Nothing to do! */
+      break;
+    case YXML_ELEMSTART:
+      {
+        EyxmlTags tag_sym = eyxml_get_tag(eyxml_context, eyxml_context->yxml_context->elem);
+        if(tag_sym == EYXML_TAGS_NUMBER)
+        {
+          if(eyxml_context->on_error_cb)
+            eyxml_context->on_error_cb(XML_EUDEFT, eyxml_context->yxml_context->line, eyxml_context->yxml_context->byte);
+          return;
+        }
+        is_innner_value = 1;
+        /* Check XML rules */
+        if(eyxml_check_tags_rules(current_tag, tag_sym) == EYXML_STATUS_ERR){
+          if(eyxml_context->on_error_cb)
+            eyxml_context->on_error_cb(XML_ETNP, eyxml_context->yxml_context->line, eyxml_context->yxml_context->byte);
+          return;
+        }
+        current_tag = eyxml_add_tag(eyxml_context, current_tag);
+        current_tag->type = tag_sym;
+        tag_value_offset = 0;
+        tag_value = NULL;
+      }
+      break;
+    case YXML_CONTENT:
+      {
+        const char * value = eyxml_context->yxml_context->data;
+        if(!is_innner_value)
+          break;
+
+        if(tag_value == NULL)
+        	tag_value = (char *)eyxml_malloc(eyxml_context, 8);
+        while(*value){
+        	tag_value[tag_value_offset++] = *value++;
+        	if((tag_value_offset % 8) == 0){
+        		size_t new_length = ((tag_value_offset / 8) + 1) * 8;
+        		char * temp = (char *)eyxml_malloc(eyxml_context, new_length);
+        		memcpy(temp, tag_value, tag_value_offset);
+        		eyxml_free(eyxml_context, tag_value);
+        		tag_value = temp;
+        	}
+        }
+        tag_value[tag_value_offset] = 0; //Zero-Terminate
+      }
+      break;
+
+    case YXML_ELEMEND:
+      if(tag_value_offset){
+		  current_tag->str_value = (char *)eyxml_malloc(eyxml_context, tag_value_offset+1);
+		  memcpy(current_tag->str_value, tag_value, tag_value_offset+1);
+		  tag_value_offset = 0;
+      }
+      if(tag_value){
+		  eyxml_free(eyxml_context, tag_value);
+		  tag_value = NULL;
+      }
+      is_innner_value = 0;
+      current_tag = current_tag->parent;
+      break;
+    case YXML_ATTRSTART:
+      {
+        char * name = eyxml_context->yxml_context->attr;
+        EyxmlAttribs attrib_type = eyxml_get_attrib(eyxml_context, name);
+        if(attrib_type == EYXML_ATTRS_NUMBER)
+        {
+          if(eyxml_context->on_error_cb)
+            eyxml_context->on_error_cb(XML_EUDEFA, eyxml_context->yxml_context->line, eyxml_context->yxml_context->byte);
+          return;
+        }
+        current_attr = eyxml_add_attrib(eyxml_context, current_tag);
+        current_attr->type = attrib_type;
+        attr_value_offset = 0;
+        attr_value = (char *)eyxml_malloc(eyxml_context, 8);
+      }
+      break;
+    case YXML_ATTRVAL:
+      {
+        if(current_attr == NULL)
+          break;
+        char * value = eyxml_context->yxml_context->data;
+        while(*value){
+        	attr_value[attr_value_offset++] = *value++;
+        	if((attr_value_offset % 8) == 0){
+        		size_t new_length = ((attr_value_offset / 8) + 1) * 8;
+        		char * temp = (char *)eyxml_malloc(eyxml_context, new_length);
+        		memcpy(temp, attr_value, attr_value_offset);
+        		eyxml_free(eyxml_context, attr_value);
+        		attr_value = temp;
+        	}
+        }
+        attr_value[attr_value_offset] = 0; //Zero-Terminate
+      }
+      break;
+    case YXML_ATTREND:
+      if(eyxml_set_attr_value(eyxml_context, current_attr, attr_value) == EYXML_STATUS_ERR){
+        if(eyxml_context->on_error_cb)
+        eyxml_context->on_error_cb(XML_EINVV, eyxml_context->yxml_context->line, eyxml_context->yxml_context->byte);
+        return;
+      }
+      eyxml_free(eyxml_context, attr_value);
+      current_attr = NULL;
+      break;
+
+    case YXML_PISTART:
+    case YXML_PICONTENT:
+    case YXML_PIEND:
+      break;
+    }
+    xml_str++;
+  }
+
+  eyxml_free(eyxml_context, eyxml_context->yxml_context);
+}
+
+void eyxml_release(eyxml_t * eyxml_context){
+	eyxml_free(eyxml_context, eyxml_context->yxml_context);
+	eyxml_remove_all_childs(eyxml_context, (eyxml_tag_t *) eyxml_context->root);
+}

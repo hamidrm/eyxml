@@ -1,0 +1,136 @@
+#ifndef _EYXML_PARSER_H_
+#define _EYXML_PARSER_H_
+
+#include "yxml.h"
+
+#define YXML_BUFSIZE <<<eyxml_buffsize>>>
+#define EYXML_TAGS_NAME_MAX_LENGTH  <<<eyxml_tags_name_max_length>>>
+#define EYXML_TAGS_NUMBER        <<<eyxml_tags_number>>>
+#define EYXML_ATTRS_NAME_MAX_LENGTH  <<<eyxml_attrs_name_max_length>>>
+#define EYXML_ATTRS_NUMBER       <<<eyxml_attrs_number>>>
+
+#define EYXML_GET_ATTR(elem, attr, type) eyxml_get_attr_##type##_val(elem, attr)
+#define EYXML_GET_ATTR_PROTOTYPE_FUN(type) eyxml_##type##_ptr_t eyxml_get_attr_##type##_val(eyxml_elem_t * elem, EyxmlAttribs attr)
+#define EYXML_GET_ATTR_DEF_FUN(type) eyxml_##type##_ptr_t eyxml_get_attr_##type##_val(eyxml_elem_t * elem, EyxmlAttribs attr){\
+	if(EYXML_TYPE_##type == eyxml_attrs_types[attr]){\
+		void * attr_val_ptr = eyxml_get_attr_val(elem, attr);\
+		return (eyxml_##type##_ptr_t)attr_val_ptr;\
+	}\
+	return NULL;\
+}
+
+
+typedef enum{
+  EYXML_STATUS_OK,
+  EYXML_STATUS_ERR = -1,
+} EyxmlStatus;
+
+
+typedef enum{
+  EYXML_TYPE_STRING,
+  EYXML_TYPE_BOOL,
+  EYXML_TYPE_COLOR,
+  EYXML_TYPE_INT,
+  EYXML_TYPE_UINT,
+  EYXML_TYPE_DECIMAL,
+<<<eyxml_attrs_list>>>
+} EyxmlAttributesValuesType;
+
+
+typedef enum{
+  XML_EEOF,
+  XML_EREF,
+  XML_ECLOSE,
+  XML_ESTACK,
+  XML_ESYN,
+  XML_ETNP,
+  XML_EUDEFT,
+  XML_EUDEFA,
+  XML_EINVV,
+} EyxmlParserError;
+
+typedef enum{
+<<<eyxml_tags>>>
+} EyxmlTags;
+
+
+typedef enum{
+<<<eyxml_attrs>>>
+} EyxmlAttribs;
+
+typedef enum{
+	EYXML_ATTR_BOOL_FALSE,
+	EYXML_ATTR_BOOL_TRUE,
+}EyxmlAttrBool;
+
+<<<eyxml_enum_attrs_lists>>>
+
+typedef void * ptr;
+typedef struct _eyxml_attrib_t eyxml_attrib_t ;
+typedef struct _eyxml_tag_t eyxml_tag_t;
+typedef struct _eyxml_t eyxml_t;
+typedef void(*xml_parser_on_error_t)(EyxmlParserError err, uint16_t line,uint16_t col) ;
+
+/* Standard EYXML types */
+typedef char ** eyxml_STRING_ptr_t;
+typedef EyxmlAttrBool * eyxml_BOOL_ptr_t;
+typedef uint32_t * eyxml_COLOR_ptr_t;
+typedef int32_t * eyxml_INT_ptr_t;
+typedef uint32_t * eyxml_UINT_ptr_t;
+typedef float * eyxml_DECIMAL_ptr_t;
+/* New defined types */
+<<<eyxml_typedef_attrs_lists>>>
+
+typedef struct {
+  EyxmlTags type;
+  char * value;
+}eyxml_elem_t;
+
+struct _eyxml_attrib_t{
+  EyxmlAttribs  type;
+  union {
+    char * str_v;
+    int32_t int_v;
+    uint32_t uint_v;
+    float float_v;
+  } value;
+  eyxml_attrib_t * next_attrib;
+};
+
+struct _eyxml_tag_t{
+  EyxmlTags type;
+  char * str_value;
+  eyxml_tag_t * parent;
+  eyxml_tag_t * next_tag;
+  eyxml_attrib_t * attribs_root;
+  eyxml_tag_t * childs_root;
+  uint32_t attribs_cnt;
+  uint32_t childs_cnt;
+};
+
+
+struct _eyxml_t{
+  xml_parser_on_error_t on_error_cb;
+  yxml_t * yxml_context;
+  const char * xml_data;
+  eyxml_elem_t * root;
+  uint32_t  heap_used;
+};
+
+EYXML_GET_ATTR_PROTOTYPE_FUN(STRING);
+EYXML_GET_ATTR_PROTOTYPE_FUN(BOOL);
+EYXML_GET_ATTR_PROTOTYPE_FUN(COLOR);
+EYXML_GET_ATTR_PROTOTYPE_FUN(INT);
+EYXML_GET_ATTR_PROTOTYPE_FUN(UINT);
+EYXML_GET_ATTR_PROTOTYPE_FUN(DECIMAL);
+<<<eyxml_get_attr_prototype_fun>>>
+
+
+void eyxml_init(eyxml_t * eyxml_context);
+void eyxml_parse(eyxml_t * eyxml_context);
+const char * eyxml_err_str(EyxmlParserError err);
+size_t eyxml_count_childs(eyxml_elem_t * node);
+eyxml_elem_t * eyxml_next_child(eyxml_elem_t * node, eyxml_elem_t * prev_child);
+eyxml_elem_t * eyxml_get_child_at(eyxml_elem_t * node, uint32_t index);
+void eyxml_release(eyxml_t * eyxml_context);
+#endif
